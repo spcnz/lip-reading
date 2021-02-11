@@ -13,8 +13,9 @@ from vocab import Vocabulary
 
 def preprocess(speaker):
 
-    # input_tensor = Input(shape=(224, 224, 3))
-    # vgg_model = VGGFace(input_tensor=input_tensor, include_top=False, pooling='avg')
+    input_tensor = Input(shape=(224, 224, 3))
+    #don't include 3 fully connected layers on top
+    vgg_model = VGGFace(input_tensor=input_tensor, include_top=False, pooling='avg')
     pass
 
 if __name__ == '__main__':
