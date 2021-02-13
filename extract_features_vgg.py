@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from glob import glob
-np.random.seed(1337)
 import sys
 
 from keras.layers import Input
@@ -9,7 +8,6 @@ from keras_vggface.vggface import VGGFace
 import os
 import math
 
-from vocabulary import Vocabulary
 from util import curses_init, curses_clean_up, progress_msg
 from constants import FEATURE_DIRECTORY_PATH, VIDEO_DIRECTORY_PATH, ALIGN_DIRECTORY_PATH
 
@@ -43,11 +41,9 @@ def parse_alignment(file):
     return segments[1:-1], num_frames
 
 def process_video(speaker, vid_name):
-
-    ''' Split a video into sets of frames corresponding to each spoken word. '''
     video_path = os.path.join(VIDEO_DIRECTORY_PATH, speaker, vid_name)
     align_name = vid_name.split('.')[0] + '.align'
-    align_path = os.path.join(ALIGN_DIRECTORY_PATH, speaker, align_name)
+    align_path = os.path.join(ALIGN_DIRECTORY_PATH, speaker,'align',  align_name)
 
     cap = cv2.VideoCapture(video_path)
 
@@ -122,7 +118,7 @@ def preprocess(speaker):
                     raise SystemExit
 
                 word_count += 1
-                progress_msg(stdscr, video_count, word_count, video_name, num_videos)
+                progress_msg(stdscr, video_ordinal, word_count, video_name, num_videos)
 
                 # Format of the file name is [video_name]_[word_index]_[word].
                 feature_file_name = '{}_{}_{}'.format(name_no_ext, i, output[i])
