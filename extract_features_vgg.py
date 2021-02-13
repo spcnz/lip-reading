@@ -11,6 +11,9 @@ import math
 from util import curses_init, curses_clean_up, progress_msg
 from constants import FEATURE_DIRECTORY_PATH, VIDEO_DIRECTORY_PATH, ALIGN_DIRECTORY_PATH
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 def parse_alignment(file):
     f = open(file, 'r')
     lines = f.readlines()
@@ -47,38 +50,38 @@ def process_video(speaker, vid_name):
 
     cap = cv2.VideoCapture(video_path)
 
-    #alignments will be list of tuples (start_frame_num, end_frame_num, word) for every word in alignment file
+    #alignments will be list of tuples (start_frame, end_frame, word) for every word in alignment file 
     alignments, num_frames = parse_alignment(align_path)
     frames = np.ndarray(shape=(num_frames, 224, 224, 3), dtype=np.float32)
+    frame_num = 0
+    has_frame, img = cap.read()
 
-    frame = 0
-    ret, img = cap.read()
+    while has_frame:
+        resized_frame = cv2.resize(img, (224, 224)).astype(np.float32)
 
-    while ret:
-        x = cv2.resize(img, (224, 224)).astype(np.float32)
-
-        x = np.expand_dims(x, axis=0)
+        resized_frame = np.expand_dims(resized_frame, axis=0)
         # Zero-center by mean pixel
-        x[:, :, :, 0] -= 93.5940
-        x[:, :, :, 1] -= 104.7624
-        x[:, :, :, 2] -= 129.1863
+        resized_frame[:, :, :, 0] -= 93.5940
+        resized_frame[:, :, :, 1] -= 104.7624
+        resized_frame[:, :, :, 2] -= 129.1863
 
-        frames[frame,:,:,:] = x
+        #add resized_frame into frames array
+        frames[frame_num,:,:,:] = resized_frame
 
-        ret, img = cap.read()
+        has_frame, img = cap.read()
 
-        frame += 1
+        frame_num += 1
 
     # Divide up frames based on mapping to spoken words.
     word_frames = []
-    output = []
+    words_arr = []
     for seg in alignments:
         word_frames.append(frames[seg[0]:seg[1],:,:])
-        output.append(seg[2])
+        words_arr.append(seg[2])
 
-    return word_frames, output
+    return word_frames, words_arr
 
-def preprocess(speaker):
+def extract_features(speaker):
 
     stdscr = curses_init()
 
@@ -98,44 +101,47 @@ def preprocess(speaker):
     num_videos = len(video_paths)
     word_count = 0
    
-    stdscr.addstr(0, 0, f'Extracting facial features for speaker {speaker}. Press q to exit.')
+    stdscr.addstr(0, 0, f'Extracting facial features for speaker {speaker}.')
     stdscr.refresh()
 
     try:
         for video_ordinal, video_path in enumerate(video_paths):
             video_name = os.path.basename(video_path)
+
             progress_msg(stdscr, video_ordinal, word_count, video_name, num_videos)
-            print(video_name)
-            word_frames, output = process_video(speaker, video_name)
+
+            word_frames, words_arr = process_video(speaker, video_name)
 
             name_no_ext = video_name.split('.')[0]
-
+            
             # Process each word's set of frames.
             for i, word_frame in enumerate(word_frames):
-                # Check if the user has hit q to exit.
-                c = stdscr.getch()
-                if c == ord('q'):
-                    raise SystemExit
 
                 word_count += 1
                 progress_msg(stdscr, video_ordinal, word_count, video_name, num_videos)
 
                 # Format of the file name is [video_name]_[word_index]_[word].
-                feature_file_name = '{}_{}_{}'.format(name_no_ext, i, output[i])
+                feature_file_name = f'{name_no_ext}_{i}_{words_arr[i]}'
+                
+                
                 feature_file_path = os.path.join(speaker_feature_dir, feature_file_name)
-
-                # If the file already exists, we don't want to waste time processing it again.
-                if os.path.isfile(feature_file_path + '.npy'):
+            
+                if (feature_exists(feature_file_path)):
                     continue
-
+ 
                 # Classify the frames and save the features to a file.
                 features = vgg_model.predict(word_frame)
                 np.save(feature_file_path, features)
-    except (SystemExit, KeyboardInterrupt):
+    except (KeyboardInterrupt):
         pass
     finally:
         curses_clean_up()
 
+
+def feature_exists(feature_file_path):
+    '''checks if feature is already generated'''
+
+    return os.path.isfile(feature_file_path + '.npy')
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -143,4 +149,4 @@ if __name__ == '__main__':
         print('python preprocess.py sp1 [sp2] ...')
     else:
         for speaker in sys.argv[1:]:
-            preprocess(speaker)
+            extract_features(speaker)
