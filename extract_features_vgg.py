@@ -7,12 +7,11 @@ from keras.layers import Input
 from keras_vggface.vggface import VGGFace
 import os
 import math
-
+from keras_vggface.utils import preprocess_input
 from util import curses_init, curses_clean_up, progress_msg
-from constants import FEATURE_DIRECTORY_PATH, VIDEO_DIRECTORY_PATH, ALIGN_DIRECTORY_PATH
+from constants import FEATURE_DIRECTORY_PATH, VIDEO_DIRECTORY_PATH, ALIGN_DIRECTORY_PATH, DEMO_ALIGN_DIRECTORY_PATH
 
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 def parse_alignment(file):
     f = open(file, 'r')
@@ -38,15 +37,18 @@ def parse_alignment(file):
     last_word_end_frame = segments[-1][1]
     firs_word_start_frame = segments[0][0]
     num_frames = last_word_end_frame - firs_word_start_frame
-    print('num of frames per video', num_frames)
 
     # exclude first and last (cause it's sil)
     return segments[1:-1], num_frames
 
-def process_video(speaker, vid_name):
-    video_path = os.path.join(VIDEO_DIRECTORY_PATH, speaker, vid_name)
+def process_video(speaker, vid_name, video_path, is_demo=False):                                                                                                                                                                                  
+    # video_path = os.path.join(VIDEO_DIRECTORY_PATH, speaker, vid_name)
+   
+    video_path = os.path.join(video_path, speaker, vid_name)
+
     align_name = vid_name.split('.')[0] + '.align'
-    align_path = os.path.join(ALIGN_DIRECTORY_PATH, speaker,'align',  align_name)
+    align_dir = DEMO_ALIGN_DIRECTORY_PATH if is_demo else ALIGN_DIRECTORY_PATH
+    align_path = os.path.join(align_dir, speaker,'align',  align_name)
 
     cap = cv2.VideoCapture(video_path)
 
@@ -60,11 +62,11 @@ def process_video(speaker, vid_name):
         resized_frame = cv2.resize(img, (224, 224)).astype(np.float32)
 
         resized_frame = np.expand_dims(resized_frame, axis=0)
-        # Zero-center by mean pixel
+        #Zero-center by mean pixel
         resized_frame[:, :, :, 0] -= 93.5940
         resized_frame[:, :, :, 1] -= 104.7624
         resized_frame[:, :, :, 2] -= 129.1863
-
+        # resized_frame = preprocess_input(resized_frame, version=2)
         #add resized_frame into frames array
         frames[frame_num,:,:,:] = resized_frame
 
@@ -81,7 +83,7 @@ def process_video(speaker, vid_name):
 
     return word_frames, words_arr
 
-def extract_features(speaker):
+def extract_features(speaker, feature_path=FEATURE_DIRECTORY_PATH, video_dir_path=VIDEO_DIRECTORY_PATH, is_demo=False):
 
     stdscr = curses_init()
 
@@ -91,12 +93,12 @@ def extract_features(speaker):
     vgg_model = VGGFace(input_tensor=input_tensor, include_top=False, pooling='avg')
 
     #create folder for speaker's features
-    speaker_feature_dir = os.path.join(FEATURE_DIRECTORY_PATH, speaker)
+    speaker_feature_dir = os.path.join(feature_path, speaker)
     if not os.path.isdir(speaker_feature_dir):
         os.mkdir(speaker_feature_dir)
 
     # Get list of all videos to process.
-    video_glob = os.path.join(VIDEO_DIRECTORY_PATH, speaker, '*.mpg')
+    video_glob = os.path.join(video_dir_path, speaker, '*.mpg')
     video_paths = glob(video_glob)
     num_videos = len(video_paths)
     word_count = 0
@@ -110,8 +112,7 @@ def extract_features(speaker):
 
             progress_msg(stdscr, video_ordinal, word_count, video_name, num_videos)
 
-            word_frames, words_arr = process_video(speaker, video_name)
-
+            word_frames, words_arr = process_video(speaker, video_name, video_dir_path, is_demo=is_demo)
             name_no_ext = video_name.split('.')[0]
             
             # Process each word's set of frames.
@@ -122,13 +123,12 @@ def extract_features(speaker):
 
                 # Format of the file name is [video_name]_[word_index]_[word].
                 feature_file_name = f'{name_no_ext}_{i}_{words_arr[i]}'
-                
-                
+
                 feature_file_path = os.path.join(speaker_feature_dir, feature_file_name)
-            
+
                 if (feature_exists(feature_file_path)):
                     continue
- 
+
                 # Classify the frames and save the features to a file.
                 features = vgg_model.predict(word_frame)
                 np.save(feature_file_path, features)
@@ -136,7 +136,6 @@ def extract_features(speaker):
         pass
     finally:
         curses_clean_up()
-
 
 def feature_exists(feature_file_path):
     '''checks if feature is already generated'''

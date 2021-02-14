@@ -3,21 +3,11 @@ import glob
 import numpy as np
 from vocabulary import Vocabulary
 
-from constants import FEATURE_DIRECTORY_PATH, NUM_FACIAL_FEATURES, NUM_FRAMES
+from constants import FEATURE_DIRECTORY_PATH, NUM_FACIAL_FEATURES, NUM_FRAMES, DEMO_FEATURE_DIRECTORY_PATH_SINGLE, DEMO_FEATURE_DIRECTORY_PATH_MULTY
 
 DATASET_RANGE = list(range(1, 21)) + list(range(22, 35))
 
 vocab = Vocabulary()
-
-def normalize_word_frame(word_frame):
-    norm = np.linalg.norm(word_frame)
-    if norm == 0:
-        # If the norm is zero, meaning the vector is zero, we just use
-        # an evenly distributed unit array.
-        ones = np.ones(word_frame.shape)
-        return ones / np.linalg.norm(ones)
-    return word_frame / norm
-
 
 def condense_frames(frames, desired_length):
 
@@ -57,17 +47,26 @@ def condense_frames(frames, desired_length):
 
     return condensed_frames
 
-def get_paths_test(speakers):
+def get_paths_test(speakers, is_single = True, is_demo = True):
     file_paths = []
     for sp in speakers:
-        glob_data = os.path.join(FEATURE_DIRECTORY_PATH, 's'+str(sp), 'test','*.npy')
+        test_folder = 'test' if is_single and not is_demo else ''
+        feature_path = FEATURE_DIRECTORY_PATH
+        if (is_demo):
+            if(is_single):
+                feature_path = DEMO_FEATURE_DIRECTORY_PATH_SINGLE
+            else:
+                feature_path = DEMO_FEATURE_DIRECTORY_PATH_MULTY
+        glob_data = os.path.join(feature_path, 's'+str(sp), test_folder, '*.npy')
         file_paths.extend(glob.glob(glob_data))       
     return file_paths
 
-def get_paths_train(speakers):
+def get_paths_train(speakers, is_single = True):
     file_paths = []
     for sp in speakers:
-        glob_data = os.path.join(FEATURE_DIRECTORY_PATH, 's'+str(sp), 'train', '*.npy')
+        train_folder = 'train' if is_single else ''
+        feature_path = FEATURE_DIRECTORY_PATH
+        glob_data = os.path.join(feature_path, 's'+str(sp), train_folder, '*.npy')
         file_paths.extend(glob.glob(glob_data))       
     return file_paths
 
@@ -108,9 +107,6 @@ def avg_frames(features):
 
 def hot_encoding(words):
     global vocab
-    
-    vocab.extend(words)
-
     hot_encoded_words = []
     for word in words:
         zeros = np.zeros(51, dtype=np.float32)
@@ -120,21 +116,19 @@ def hot_encoding(words):
 
 
 
-def get_features_train(speakers):
+def get_features_train(speakers, is_single=True):
     global vocab
 
-    feature_paths = get_paths_train(speakers)
-    print('train putanja', feature_paths[0])
+    feature_paths = get_paths_train(speakers, is_single)
 
     features, labels = load_features(feature_paths)
     
     return features, labels, vocab
 
-def get_features_test(speakers):
+def get_features_test(speakers, is_single = True, is_demo = True):
     global vocab
     
-    feature_paths = get_paths_test(speakers)
-    print('test putanja', feature_paths[0])
+    feature_paths = get_paths_test(speakers, is_single = is_single, is_demo = is_demo)
 
 
     features, labels = load_features(feature_paths)
@@ -149,8 +143,6 @@ def load_features(feature_paths, use_delta_frames=True):
     labels = hot_encoding(labels)
 
     longest_word_max_frames = max_frames(features)
-    print("LONGEST WORD",longest_word_max_frames)
-    print("AVG WORD", avg_frames(features))
 
     if use_delta_frames:
         number_of_frames = NUM_FRAMES + 1
@@ -174,9 +166,6 @@ def load_features(feature_paths, use_delta_frames=True):
 
             # Remove extra frame from the end.
             features[i] = features[i][:NUM_FRAMES, ...]
-
-      
-        features[i] = normalize_word_frame(features[i])
 
     # Convert to numpy arrays.
     features = np.asarray(features)

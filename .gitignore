@@ -1,4 +1,6 @@
 env/
 .ipynb_checkpoints/
 __pycache__/
-data/
+data/features
+data/align
+data/videos/*
