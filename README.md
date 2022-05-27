@@ -1,4 +1,5 @@
 # Lip-reading
+Project for course Soft Computing at FTN, Novi Sad, 2021.
 
 ## Training and evaluation
 ### Speaker dependent training
