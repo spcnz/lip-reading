@@ -1,4 +1,4 @@
-# lip-reading
+# Lip-reading
 
 ## Training and evaluation
 ### Speaker dependent training
@@ -14,6 +14,5 @@ za potrebe demonstriranja (bez treniranja) potrebno je samo instalirati sve iz r
 - python demo.py multy
 
 ### Poster
-
 ![Screenshot from 2022-05-27 23-16-27](https://user-images.githubusercontent.com/52412989/170790519-9d960213-ff57-4b33-8214-57ec382bfe3e.png)
 
